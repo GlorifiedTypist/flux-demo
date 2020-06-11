@@ -1,0 +1,65 @@
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: podinfo-bg
+spec:
+  provider: nginx
+  # deployment reference
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: podinfo-bg
+  # ingress reference
+  ingressRef:
+    apiVersion: extensions/v1beta1
+    kind: Ingress
+    name: podinfo-bg
+  # HPA reference (optional)
+  autoscalerRef:
+    apiVersion: autoscaling/v2beta1
+    kind: HorizontalPodAutoscaler
+    name: podinfo-bg
+  # the maximum time in seconds for the canary deployment
+  # to make progress before it is rollback (default 600s)
+  progressDeadlineSeconds: 60
+  service:
+    # ClusterIP port number
+    port: 80
+    # container port number or name
+    targetPort: 9898
+  analysis:
+    # schedule interval (default 60s)
+    interval: 1m
+    # max number of failed metric checks before rollback
+    threshold: 10
+    # max traffic percentage routed to canary
+    # percentage (0-100)
+    iterations: 10
+    metrics:
+    - name: error-rate
+      templateRef:
+        name: error-rate
+      # minimum req success rate (non 5xx responses)
+      # percentage (0-100)
+      thresholdRange:
+        max: 1
+      interval: 60s
+    webhooks:
+      # - name: "Ask for confirmation"
+      #   type: confirm-rollout
+      #   url: http://flagger-loadtester.cicd/gate/check
+      - name: "Promotion gate"
+        type: confirm-promotion
+        url: http://flagger-loadtester.cicd/gate/approve
+      - name: acceptance-test
+        type: pre-rollout
+        url: http://flagger-loadtester.cicd/
+        timeout: 30s
+        metadata:
+          type: bash
+          cmd: "curl -sd 'test' http://podinfo-bg-canary.default/token | grep token"
+      - name: load-test
+        url: http://flagger-loadtester.cicd/
+        timeout: 5s
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 -H 'Cookie: canary=always' http://info.20.185.76.89.nip.io/"
