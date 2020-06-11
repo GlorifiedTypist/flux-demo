@@ -1,0 +1,17 @@
+apiVersion: helm.fluxcd.io/v1
+kind: HelmRelease
+metadata:
+  name: flagger
+  namespace: cicd
+  annotations:
+    fluxcd.io/ignore: "false"
+spec:
+  releaseName: flagger
+  chart:
+    repository: https://flagger.app
+    name: flagger
+    version: 0.25.0
+  values:
+    logLevel: debug
+    meshProvider: nginx
+    metricsServer: "http://prometheus-server.istio-system.svc.cluster.local"
